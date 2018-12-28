@@ -14,7 +14,7 @@ def getDataFromDynamo(event):
     table_name = "IotStaging"
     dynamodb_resource = boto3.resource('dynamodb',region_name = region)
     table = dynamodb_resource.Table(table_name)
-
+    #@TODO revoew the starDate and endDate values because they are a string and should be a datetime integer
     iotStaging = table.query(
         KeyConditionExpression=Key('IotId').eq(str(event['iotId'])) & Key('datetime').between(str(event["startDate"]), str(event['endDate']))
     )
