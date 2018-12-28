@@ -98,6 +98,13 @@ custom:
 functions:
   dataStaging:
     handler: dataStaging.main
+  averageConsumptionGET:
+    handler: averageConsumptionGET.main
+    events:
+      - http:
+          method: GET
+          path: /averageConsumption
+          resp: json
 
 #    The following are a few example events you can configure
 #    NOTE: Please make sure to change your handler code to work with those events
