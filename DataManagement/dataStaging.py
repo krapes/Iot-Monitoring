@@ -8,7 +8,8 @@ import json
 import datetime
 
 session = boto3.session.Session()
-dynamodb = boto3.resource('dynamodb', region_name=session.region_name)
+dynamodb = boto3.resource('dynamodb', region_name=session.region_name, endpoint_url='http://localhost:8000')
+print(session.region_name)
 credentials = session.get_credentials().get_frozen_credentials()
 # NOTE: REMOVE https://
 esendpoint = 'search-lythium-petroleo-mef30-r6mjhvjxxdnuscouv53hulfrie.us-west-2.es.amazonaws.com'
@@ -67,38 +68,42 @@ def calculateItems(entries, index, timestep=60):
     items = []
     for i, entry in enumerate(entries):
         entry = entry['_source']
-        acd_sum += entry['ADC']
-        try:
-            startDate = entries[startDT_i]['_source']['date']
-            endDate = entry['date']
-            sDate = datetime.datetime.strptime(startDate, '%d/%m/%Y %H:%M:%S')
-            eDate = datetime.datetime.strptime(endDate, '%d/%m/%Y %H:%M:%S')
+        if entry['ADC'] != None:
+            acd_sum += entry['ADC']
+            try:
+                startDate = entries[startDT_i]['_source']['date']
+                endDate = entry['date']
+                sDate = datetime.datetime.strptime(startDate, '%d/%m/%Y %H:%M:%S')
+                eDate = datetime.datetime.strptime(endDate, '%d/%m/%Y %H:%M:%S')
 
-            if (eDate - sDate).total_seconds() >= timestep:
+                if (eDate - sDate).total_seconds() >= timestep:
 
-                count = i - startDT_i
-                avg = acd_sum / count
+                    count = i - startDT_i
+                    avg = acd_sum / count
 
-                stagingDatetime = sDate + (eDate - sDate) / 2
-                stagingDatetime = int(stagingDatetime.strftime("%Y%m%d%H%M%S"))
+                    stagingDatetime = sDate + (eDate - sDate) / 2
+                    stagingDatetime = int(stagingDatetime.strftime("%Y%m%d%H%M%S"))
 
-                item = {'ADC': avg,
-                        'esdatetimeStart': startDT,
-                        'esdatetimeEnd': entry['datetime'],
-                        'esdatetime': int((startDT + entry['datetime']) / 2),
-                        'datetime': stagingDatetime,
-                        'dateStart': startDate,
-                        'dateEnd': endDate,
-                        'IotId': index
-                        }
-                items.append(item)
-                startDT = entry['datetime']
-                startDT_i = i
-                acd_sum = 0
-                # print(items[-2]['dateEnd'], items[-1]['dateStart'])
-        except Exception as e:
-            print(e)
+                    item = {'ADC': avg,
+                            'esdatetimeStart': startDT,
+                            'esdatetimeEnd': entry['datetime'],
+                            'esdatetime': int((startDT + entry['datetime']) / 2),
+                            'datetime': stagingDatetime,
+                            'dateStart': startDate,
+                            'dateEnd': endDate,
+                            'IotId': index
+                            }
+                    items.append(item)
+                    startDT = entry['datetime']
+                    startDT_i = i
+                    acd_sum = 0
+                    # print(items[-2]['dateEnd'], items[-1]['dateStart'])
+            except Exception as e:
+                print(e)
+                print(i, entry)
+        else:
             print(i, entry)
+
     print("Created {} Items".format(len(items)))
     return items
 
@@ -137,6 +142,7 @@ def getStartDT(IotId):
     except Exception as e:
         print(e)
         startDT = None
+        print("startDT = {}".format(startDT))
 
     return startDT
 
@@ -154,8 +160,10 @@ def main(event, context):
         itterations = 0
 
         while paginate == True:
+            print("Starting Iteration {}".format(itterations))
             itterations += 1
             response = getResponses(event)
+            print(response)
             entries = response['body']['hits']['hits']
             if len(entries) < 10000:
                 paginate = False
@@ -163,12 +171,13 @@ def main(event, context):
             if len(items) >= 1:
                 # print(event['startDT'], items[-1]['datetimeEnd'])
                 event['startDT'] = items[-1]['esdatetimeEnd']
-                putToTable("IotStaging", items)
+                putToTable("IotStaging2", items)
+                progressItem = {'IotId': event['index'],
+                                'datetime': event['startDT']}
+                putToTable('IotStagingProgress', [progressItem])
 
 
-        progressItem = {'IotId': event['index'],
-                        'datetime': event['startDT']}
-        putToTable('IotStagingProgress', [progressItem])
+
         print("Done in {} itterations".format(itterations))
     except Exception as e:
         print(e)

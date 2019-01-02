@@ -50,6 +50,9 @@ provider:
        Action:
          - "dynamodb:PutItem"
          - "dynamodb:GetItem"
+         - "dynamodb:ListTables"
+         - "dynamodb:Query"
+         - "dynamodb:Scan"
        Resource:
          - "arn:aws:dynamodb:us-west-2:410775198449:table/*"
 
@@ -105,6 +108,9 @@ functions:
           method: GET
           path: /averageConsumption
           resp: json
+
+  calcComsumption:
+    handler: calcComsumption.main
 
 #    The following are a few example events you can configure
 #    NOTE: Please make sure to change your handler code to work with those events
