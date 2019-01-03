@@ -1,0 +1,105 @@
+swagger: '2.0'
+info:
+  description: >-
+    This documentation covers all endpoints related to the Lythium Iot Report project.
+  version: 1.0.0
+  title: Lythium Iot Report
+  contact:
+    email: kerri.rapes@gmail.com
+# host: TBD.com
+# basePath: /v1
+tags:
+  - name: Comsumption
+    description: Obtain historical data about the Iots consumption records.
+
+
+schemes:
+  - https
+paths:
+  /comsumption:
+    get:
+      tags:
+        - Comsumption
+      summary: return historical consumption data
+      description: >-
+
+      produces:
+        - application/json
+      consumes:
+        - application/json
+      parameters:
+        - in: body
+          name: request
+          required: true
+          schema:
+            type: object
+            properties:
+              startDate:
+                type: string
+              endDate:
+                type: string
+              IotId:
+                type: string
+      responses:
+        '200':
+          description: OK
+          schema:
+            $ref: '#/definitions/comsumption'
+        '403':
+          description: FORBIDDEN
+        '500':
+          description: SERVER ERROR
+
+definitions:
+  comsumption:
+    type: object
+    properties:
+      liter:
+        type: array
+        items:
+          type: number
+        example: [21.0, 23.0, 24.0]
+
+      time:
+        type: array
+        items:
+          type: integer
+        example: [201812310000, 201812310005, 201812310010]
+
+      discharge:
+        type: array
+        items:
+          type: object
+          properties:
+            startDate:
+              type: integer
+              example: 201812310000
+            endDate:
+              type: integer
+              example: 201812310010
+
+      recharge:
+        type: array
+        items:
+          type: object
+          properties:
+            startDate:
+              type: integer
+              example: 201812310000
+            endDate:
+              type: integer
+              example: 201812310010
+
+      abnormalcharge:
+        type: array
+        items:
+          type: object
+          properties:
+            startDate:
+              type: integer
+              example: 201812310000
+            endDate:
+              type: integer
+              example: 201812310010
+
+
