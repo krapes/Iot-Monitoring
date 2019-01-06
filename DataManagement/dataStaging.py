@@ -9,7 +9,7 @@ import datetime
 
 session = boto3.session.Session()
 dynamodb = boto3.resource('dynamodb', region_name=session.region_name, endpoint_url='http://localhost:8000')
-print(session.region_name)
+#dynamodb = boto3.resource('dynamodb', region_name=session.region_name)
 credentials = session.get_credentials().get_frozen_credentials()
 # NOTE: REMOVE https://
 esendpoint = 'search-lythium-petroleo-mef30-r6mjhvjxxdnuscouv53hulfrie.us-west-2.es.amazonaws.com'
@@ -25,10 +25,8 @@ awsauth = AWSRequestsAuth(
 )
 
 
-
 def getResponses(event):
     # Put the user query into the query DSL for more accurate search results.
-    # Note that certain fields are boosted (^).
 
     host = esendpoint  # For example, search-mydomain-id.us-west-1.es.amazonaws.com
     index = event['index']  # 'francisco'
@@ -51,10 +49,10 @@ def getResponses(event):
 
     # Create the response and add some extra content to support CORS
     response = {
-                "statusCode": 200,
-                "headers": {"Access-Control-Allow-Origin": '*'},
-                "isBase64Encoded": False
-                }
+        "statusCode": 200,
+        "headers": {"Access-Control-Allow-Origin": '*'},
+        "isBase64Encoded": False
+    }
 
     # Add the search results to the response
     response['body'] = json.loads(r.text)
@@ -77,7 +75,6 @@ def calculateItems(entries, index, timestep=60):
                 eDate = datetime.datetime.strptime(endDate, '%d/%m/%Y %H:%M:%S')
 
                 if (eDate - sDate).total_seconds() >= timestep:
-
                     count = i - startDT_i
                     avg = acd_sum / count
 
@@ -99,6 +96,7 @@ def calculateItems(entries, index, timestep=60):
                     acd_sum = 0
                     # print(items[-2]['dateEnd'], items[-1]['dateStart'])
             except Exception as e:
+                print("Exception")
                 print(e)
                 print(i, entry)
         else:
@@ -109,7 +107,6 @@ def calculateItems(entries, index, timestep=60):
 
 
 def putToTable(table_name, items):
-    # table_name =  "IotStaging"
     print("Writing in the {} table.".format(table_name))
 
     table = dynamodb.Table(table_name)
@@ -148,7 +145,6 @@ def getStartDT(IotId):
 
 
 def main(event, context):
-
     print(event)
     try:
         keyDefault = [('size', 10000), ('startDT', getStartDT(event['index']))]
@@ -158,16 +154,38 @@ def main(event, context):
         print("event: {}".format(event))
         paginate = True
         itterations = 0
+        liters = []
+        time = []
+
+        esliters = []
+        estime = []
 
         while paginate == True:
             print("Starting Iteration {}".format(itterations))
             itterations += 1
             response = getResponses(event)
-            print(response)
+            # print(response)
+
             entries = response['body']['hits']['hits']
+            try:
+                esliters += [int(entry['_source']['ADC']) for entry in entries]
+                estime += [int(
+                    datetime.datetime.strptime(entry['_source']['date'], '%d/%m/%Y %H:%M:%S').strftime("%Y%m%d%H%M%S"))
+                           for entry in entries]
+            except Exception as e:
+                print("es exception: {}".format(e))
+                pass
+
             if len(entries) < 10000:
                 paginate = False
             items = calculateItems(entries, event['index'])
+            try:
+                liters += [int(entry['ADC']) for entry in items]
+                time += [int(entry['datetime']) for entry in items]
+            except Exception as e:
+                print("items exception: {}".format(e))
+                pass
+
             if len(items) >= 1:
                 # print(event['startDT'], items[-1]['datetimeEnd'])
                 event['startDT'] = items[-1]['esdatetimeEnd']
@@ -176,11 +194,9 @@ def main(event, context):
                                 'datetime': event['startDT']}
                 putToTable('IotStagingProgress', [progressItem])
 
-
-
         print("Done in {} itterations".format(itterations))
     except Exception as e:
         print(e)
         raise Exception(e)
-
+    return {'time': time, 'liter': liters, 'estime': estime, 'esliter': esliters}
 

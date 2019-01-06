@@ -2,10 +2,20 @@ import boto3
 
 # Get the service resource.
 session = boto3.session.Session()
-dynamodb = boto3.resource('dynamodb', region_name=session.region_name, endpoint_url='http://localhost:8000')
 
 
-def create_IotStaging():
+local = False
+print("DB location local: {}".format(local))
+if local:
+    dynamodb = boto3.resource('dynamodb', region_name=session.region_name, endpoint_url='http://localhost:8000')
+    client = boto3.client('dynamodb', session.region_name, endpoint_url='http://localhost:8000')
+else:
+    dynamodb = boto3.resource('dynamodb', region_name=session.region_name)
+    client = boto3.client('dynamodb', session.region_name)
+
+
+
+def create_IotStaging2():
 
     # Create the DynamoDB table.
     table_name = 'IotStaging2'
@@ -47,10 +57,15 @@ def create_IotStaging():
     print(table.item_count)
 
 def delete_table(table_name):
+    print("Deleting table {}".format(table_name))
     table = dynamodb.Table(table_name)
     table.delete()
+    print("waiting")
+    table.meta.client.get_waiter('table_not_exists').wait(TableName=table_name)
+    print(client.list_tables()['TableNames'])
 
-def create_IotStaggingProgress():
+
+def create_IotStagingProgress():
     # Create the DynamoDB table.
     table_name = 'IotStagingProgress'
     print("creating table {}".format(table_name))
@@ -61,20 +76,14 @@ def create_IotStaggingProgress():
                 'AttributeName': 'IotId',
                 'KeyType': 'HASH'
             },
-            {
-                'AttributeName': 'datetime',
-                'KeyType': 'RANGE'
-            }
+
         ],
         AttributeDefinitions=[
-            {
-                'AttributeName': 'datetime',
-                'AttributeType': 'N'
-            },
             {
                 'AttributeName': 'IotId',
                 'AttributeType': 'S'
             },
+
 
         ],
         ProvisionedThroughput={
@@ -90,9 +99,12 @@ def create_IotStaggingProgress():
     # Print out some data about the table.
     print(table.item_count)
 
-#delete_table("IotStaging")
-create_IotStaging()
-#create_IotStaggingProgress()
+print(client.list_tables()['TableNames'])
+
+delete_table("IotStaging2")
+create_IotStaging2()
+delete_table("IotStagingProgress")
+create_IotStagingProgress()
 #delete_table("IotStagging")
 
-print(boto3.client('dynamodb', session.region_name, endpoint_url='http://localhost:8000').list_tables()['TableNames'])
+print(client.list_tables()['TableNames'])
