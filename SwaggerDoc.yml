@@ -35,9 +35,9 @@ paths:
             type: object
             properties:
               startDate:
-                type: string
+                type: integer
               endDate:
-                type: string
+                type: integer
               IotId:
                 type: string
       responses:
