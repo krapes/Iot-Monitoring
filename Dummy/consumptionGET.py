@@ -7,8 +7,11 @@ from json import JSONEncoder
 import decimal
 import logging
 import ast
-import random
-random.seed(a=0)
+import math
+import pandas as pd
+import numpy as np
+
+
 
 log = logging.getLogger()
 log.setLevel(logging.INFO)
@@ -23,23 +26,137 @@ region = os.environ["region"]
 stage = os.environ["stage"]
 
 
-def randomCharge(time):
-    charge = []
-    while random.random() < 0.5 or len(charge) == 0:
-        start = random.randint(1, len(time) - 1)
-        end = start + random.randrange(5, len(time) - (start))
-        charge.append({"startDate": time[start], "endDate": time[end]})
-    log.info(charge)
-    return charge
+def identify_outliers(df, numB=100):
 
-def calcDischarge(liter, time):
-    return randomCharge(time)
+    df['bin'] = pd.cut(df.time, bins=numB, labels=False)
+    bins = df.groupby(['bin'])['slope'].agg(['mean', 'count', 'std', 'sum'])
+    bins['bin'] = df.bin.unique()
 
-def calcRecharge(liter, time):
-    return randomCharge(time)
+    ci_hi = []
+    ci_lo = []
+    for i in bins.index:
+        m, c, s, summ, binn = bins.loc[i]
+        ci_hi.append(m + 100.0*s/math.sqrt(c))
+        ci_lo.append(m - 100.0*s/math.sqrt(c))
 
-def calcAbnormalcharge(liter, time):
-    return randomCharge(time)
+    bins['ci_hi'] = ci_hi
+    bins['ci_lo'] = ci_lo
+
+    labels = []
+    color =[]
+    previous_bin = -1
+
+    try:
+        for i, row  in df.iterrows():
+            slope = row.slope
+            if not np.isnan(slope):
+                binn = row.bin
+                if binn != previous_bin:
+                    ci_hi = bins[bins['bin'] == binn].ci_hi.values[0]
+                    ci_lo = bins[bins['bin'] == binn].ci_lo.values[0]
+                    previous_bin = binn
+
+                if slope >= ci_lo and slope <= ci_hi:
+                    labels.append("normal")
+                    color.append('b')
+
+                else:
+                    labels.append("outlier")
+                    color.append('r')
+
+            else:
+                labels.append(np.nan)
+                color.append('r')
+    except Exception as e:
+        print(i)
+        raise(e)
+
+
+    df['label'] = labels
+    df['color'] = color
+    
+    return df, bins
+
+def label_charges(df, bins, threshold=0.25):
+    labels = list(df.label)
+    color = list(df.color)
+    for i, row in df.iterrows():
+        binn = row.bin
+        if row.label != 'outlier':
+            if bins['mean'][binn] >= threshold:
+                labels[i] = 'recharge'
+                color[i] = 'g'
+            elif bins['mean'][binn] <= -threshold:
+                labels[i] = 'discharge'
+                color[i] = 'm'
+
+    df['label'] = labels
+    df['color'] = color
+    return df
+
+def model_averageDischarge(df, numB=5000, timestep=3600):
+    
+    
+    df['bin'] = pd.cut(df.time, bins=numB, labels=False)
+    df = df[df['label'] == 'discharge']
+    
+    dt = []
+    dl = []
+    previous_b = -1
+    for i, row in df.iterrows():
+        if row.bin != previous_b:
+            stime = df[df['bin'] == row['bin']]['time'].values[0]
+            sliter = df[df['bin'] == row['bin']]['liter'].values[0]
+        dt.append(row['time'] - stime)
+        dl.append(row['liter'] - sliter)
+        previous_b = row.bin
+    df['refTime'] = dt
+    df['refLiter'] = dl
+    
+
+    pcoeff1 = np.polyfit(list(df.refTime), list(df.refLiter), 1)
+
+    return pcoeff1[0]*timestep
+
+def create_timeRanges(df, bins, target):
+    
+    def merge_bins(bins):
+        bins.reset_index(drop=True, inplace=True)
+        intervals = []
+        previous_bin =  bins['bin'][0]
+        for i, row in bins.iterrows():
+            binn = row.bin
+            if binn == previous_bin + 1:
+                intervals[-1].append(binn)
+            else:
+                intervals.append([binn])
+            previous_bin = binn
+
+        return intervals
+
+    def extract_edges(df, intervals):
+        t_intervals = []
+        for interval in intervals:
+            start, stop = df[df['bin'].isin(interval)].time.agg(['min', 'max'])
+            t_intervals.append((start, stop))
+        return t_intervals
+    
+    def reformat(intervals):
+        master = []
+        for interval in intervals:
+            data = {"startDate": interval[0],
+                     "endDate": interval[1]}
+            master.append(data)
+        return master
+
+    target_bins = bins[bins['bin'].isin(df[df['label'] == target].bin.unique())]
+    if len(target_bins) > 0:
+        intervals = merge_bins(target_bins)
+        t_interval = extract_edges(df, intervals)
+        t_interval = reformat(t_interval)
+    else:
+        t_interval = []
+    return t_interval
 
 
 def date_handler(obj):
@@ -74,6 +191,7 @@ def getDataFromDynamo(event):
 
     # set the client to connect to aws dynamo
     table_name = "IotStaging2"
+    print("Retrieving Data From {}".format(table_name))
     #dynamodb_resource = boto3.resource('dynamodb',region_name = region, endpoint_url='http://localhost:8000')
     dynamodb_resource = boto3.resource('dynamodb', region_name=region)
     table = dynamodb_resource.Table(table_name)
@@ -110,6 +228,7 @@ def validate_packet(packet):
         if len(required_keys) > 0:
             exist = (lambda x: True if x in packet.keys() else x)
             required_validation = filter(lambda x: x is not True, map(exist, required_keys))
+            required_validation = list(required_validation)
         else:
             required_validation = []
 
@@ -119,9 +238,10 @@ def validate_packet(packet):
         type_check = (lambda x: True if x in keys_dict.keys()
                                         and type(packet[x]) in keys_dict[
                                             x if x in keys_dict.keys() else "default"] else x)
-        validation = filter(lambda x: x is not True, map(type_check, packet.keys()))
+        validation = list(filter(lambda x: x is not True, map(type_check, packet.keys())))
 
         log.info("validation: {}".format(validation))
+
         return required_validation, validation
 
     log.info("----Start validate_packet-----")
@@ -131,7 +251,7 @@ def validate_packet(packet):
     required_keys = ["startDate", "endDate", "IotId"]
 
     keys_dict = { "startDate": [int], "endDate": [int],
-            "IotId": [unicode, str],  "default": []}
+            "IotId": [str],  "default": []}
 
     required_validation, validation = verify(packet, required_keys, keys_dict)
 
@@ -172,12 +292,21 @@ def main(event, context):
         liter = [int(record['ADC']) for record in records['Items']]
         time = [int(record['datetime']) for record in records['Items']]
 
+        df = pd.DataFrame(data={'liter': liter, 'time': time})
+        df['slope'] = df.liter.diff()
+
+        df, bins = identify_outliers(df)
+        df = df[df['label'] != 'outlier']
+        df.reset_index()
+        
+        df = label_charges(df, bins)
+
         data = {"liter": liter,
                 "time": time,
-                "discharge": calcDischarge(liter, time),
-                "recharge": calcRecharge(liter, time),
-                "abnormalcharge": calcAbnormalcharge(liter, time),
-                "averageconsumption": {}
+                "discharge": create_timeRanges(df, bins, 'discharge'),
+                "recharge": create_timeRanges(df, bins, 'recharge'),
+                "abnormalcharge": create_timeRanges(df, bins, 'abnormal'),
+                "averageconsumption": model_averageDischarge(df.copy(), numB=5000)
                 }
 
 

@@ -4,7 +4,7 @@ import boto3
 session = boto3.session.Session()
 
 
-local = False
+local = True
 print("DB location local: {}".format(local))
 if local:
     dynamodb = boto3.resource('dynamodb', region_name=session.region_name, endpoint_url='http://localhost:8000')
@@ -101,9 +101,9 @@ def create_IotStagingProgress():
 
 print(client.list_tables()['TableNames'])
 
-delete_table("IotStaging2")
+#delete_table("IotStaging2")
 create_IotStaging2()
-delete_table("IotStagingProgress")
+#delete_table("IotStagingProgress")
 create_IotStagingProgress()
 #delete_table("IotStagging")
 

@@ -76,7 +76,7 @@ def calculateItems(entries, index, timestep=60):
 
                 if (eDate - sDate).total_seconds() >= timestep:
                     count = i - startDT_i
-                    avg = acd_sum / count
+                    avg = int(acd_sum / count)
 
                     stagingDatetime = sDate + (eDate - sDate) / 2
                     stagingDatetime = int(stagingDatetime.strftime("%Y%m%d%H%M%S"))
