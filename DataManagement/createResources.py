@@ -1,7 +1,11 @@
 import boto3
 
+
 # Get the service resource.
 session = boto3.session.Session()
+stage = 'test'
+region = session.region_name
+sfn = session.client('stepfunctions', region_name=session.region_name)
 
 
 local = True
@@ -13,7 +17,37 @@ else:
     dynamodb = boto3.resource('dynamodb', region_name=session.region_name)
     client = boto3.client('dynamodb', session.region_name)
 
+def createStepFunction():
+    sfn_name = 'consumptionSF-'+stage
 
+    result = sfn.create_state_machine(
+        name=sfn_name,
+        definition = '{'
+                     '"Comment": "Lythium-consumptionSF",'
+                     '"StartAt": "dataStaging",'
+                     '"States": {'
+                     '"dataStaging": {'
+                     '"Type": "Task",'
+                     '"Resource": "arn:aws:lambda:'+region+':410775198449:function:DataManagement-'+stage+'-dataStaging",'
+                        '"Catch": ['
+                            '{'
+                                '"ErrorEquals": ['
+                                    '"States.TaskFailed"'
+                                '],'
+                                '"Next": "consumption"'
+                            '}'
+                        '],'
+                        '"Next": "consumption"'
+                     '},'
+                     '"consumption": {'
+                            '"Type": "Task",'
+                            '"Resource": "arn:aws:lambda:'+region+':410775198449:function:DataManagement-'+stage+'-calcConsumption",'
+                            '"End": true'
+                      '}}}',
+        roleArn='arn:aws:iam::410775198449:role/service-role/StatesExecutionRole'
+    )
+
+    print(result)
 
 def create_IotStaging2():
 
@@ -101,10 +135,12 @@ def create_IotStagingProgress():
 
 print(client.list_tables()['TableNames'])
 
+
+createStepFunction()
 #delete_table("IotStaging2")
-create_IotStaging2()
+#create_IotStaging2()
 #delete_table("IotStagingProgress")
-create_IotStagingProgress()
+#create_IotStagingProgress()
 #delete_table("IotStagging")
 
 print(client.list_tables()['TableNames'])

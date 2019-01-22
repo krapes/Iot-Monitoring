@@ -8,12 +8,12 @@ import json
 import datetime
 
 session = boto3.session.Session()
-dynamodb = boto3.resource('dynamodb', region_name=session.region_name, endpoint_url='http://localhost:8000')
-#dynamodb = boto3.resource('dynamodb', region_name=session.region_name)
+#dynamodb = boto3.resource('dynamodb', region_name=session.region_name, endpoint_url='http://localhost:8000')
+dynamodb = boto3.resource('dynamodb', region_name=session.region_name)
 credentials = session.get_credentials().get_frozen_credentials()
 # NOTE: REMOVE https://
 esendpoint = 'search-lythium-petroleo-mef30-r6mjhvjxxdnuscouv53hulfrie.us-west-2.es.amazonaws.com'
-credentials = session.get_credentials().get_frozen_credentials()
+#credentials = session.get_credentials().get_frozen_credentials()
 
 awsauth = AWSRequestsAuth(
     aws_access_key=credentials.access_key,
@@ -29,7 +29,7 @@ def getResponses(event):
     # Put the user query into the query DSL for more accurate search results.
 
     host = esendpoint  # For example, search-mydomain-id.us-west-1.es.amazonaws.com
-    index = event['index']  # 'francisco'
+    index = event['IotId']  # 'francisco'
     url = 'https://' + host + '/' + index + '/_search'
 
     query = {
@@ -59,7 +59,7 @@ def getResponses(event):
     return response
 
 
-def calculateItems(entries, index, timestep=60):
+def calculateItems(entries, IotId, timestep=60):
     startDT = entries[0]['_source']['datetime']
     startDT_i = 0
     acd_sum = 0
@@ -88,7 +88,7 @@ def calculateItems(entries, index, timestep=60):
                             'datetime': stagingDatetime,
                             'dateStart': startDate,
                             'dateEnd': endDate,
-                            'IotId': index
+                            'IotId': IotId
                             }
                     items.append(item)
                     startDT = entry['datetime']
@@ -147,7 +147,7 @@ def getStartDT(IotId):
 def main(event, context):
     print(event)
     try:
-        keyDefault = [('size', 10000), ('startDT', getStartDT(event['index']))]
+        keyDefault = [('size', 10000), ('startDT', getStartDT(event['IotId']))]
         for key, default in keyDefault:
             event[key] = event[key] if validCheck(key, event) else default
 
@@ -178,7 +178,7 @@ def main(event, context):
 
             if len(entries) < 10000:
                 paginate = False
-            items = calculateItems(entries, event['index'])
+            items = calculateItems(entries, event['IotId'])
             try:
                 liters += [int(entry['ADC']) for entry in items]
                 time += [int(entry['datetime']) for entry in items]
@@ -190,7 +190,7 @@ def main(event, context):
                 # print(event['startDT'], items[-1]['datetimeEnd'])
                 event['startDT'] = items[-1]['esdatetimeEnd']
                 putToTable("IotStaging2", items)
-                progressItem = {'IotId': event['index'],
+                progressItem = {'IotId': event['IotId'],
                                 'datetime': event['startDT']}
                 putToTable('IotStagingProgress', [progressItem])
 
@@ -198,5 +198,11 @@ def main(event, context):
     except Exception as e:
         print(e)
         raise Exception(e)
-    return {'time': time, 'liter': liters, 'estime': estime, 'esliter': esliters}
+
+    response = event
+    response['time'] = time
+    response['liter'] = liters
+    response['estime'] = estime
+    response['esliter'] = esliters
+    return response
 
