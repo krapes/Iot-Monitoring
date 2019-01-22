@@ -251,7 +251,7 @@ def validate_packet(packet):
     required_keys = ["startDate", "endDate", "IotId"]
 
     keys_dict = { "startDate": [int], "endDate": [int],
-            "IotId": [str],  "default": []}
+            "IotId": [str, unicode],  "default": []}
 
     required_validation, validation = verify(packet, required_keys, keys_dict)
 
@@ -284,7 +284,10 @@ def main(event, context):
             return {
                         "isBase64Encoded": False,
                         "statusCode": 400,
-                        "headers": {},
+                        "headers": {
+                              'Access-Control-Allow-Origin': '*',
+                              'Access-Control-Allow-Credentials': True,
+                            },
                         "body": json.dumps({"clientError": packet})
                     }
 
@@ -314,7 +317,10 @@ def main(event, context):
         response = {
                    "isBase64Encoded": False,
                    "statusCode": 200,
-                   "headers": {},
+                   "headers": {
+                              'Access-Control-Allow-Origin': '*',
+                              'Access-Control-Allow-Credentials': True,
+                            },
                    "body": json.dumps(data)
                   }
 
@@ -327,7 +333,10 @@ def main(event, context):
         response = {
                     "isBase64Encoded": False,
                     "statusCode": 500,
-                    "headers": {},
+                    headers: {
+                              'Access-Control-Allow-Origin': '*',
+                              'Access-Control-Allow-Credentials': True,
+                            },
                     "body": json.dumps({"serverError": e.message})
                     }
     return response

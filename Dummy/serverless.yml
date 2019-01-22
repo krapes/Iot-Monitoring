@@ -106,6 +106,7 @@ functions:
           method: GET
           path: /dummy/consumption
           resp: json
+          cors: true 
 
 
 #    The following are a few example events you can configure
