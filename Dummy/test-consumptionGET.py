@@ -13,5 +13,11 @@ class context:
        setattr(self, "invoked_function_arn", ":consumptionGET")
 
 start = time.time()
-print(consumptionGET.main(json.loads(open('event-consumptionGET.json').read()), context()))
+response = consumptionGET.main(json.loads(open('event-consumptionGET.json').read()), context())
+print("\n\n")
 print("Total Working Time: {}".format(time.time() - start))
+for key in response.keys():
+	print(key)
+	if key != "body":
+		print(response[key])
+	print("")

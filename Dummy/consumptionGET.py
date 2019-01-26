@@ -10,7 +10,7 @@ import ast
 import math
 import pandas as pd
 import numpy as np
-
+from lambda_decorators import cors_headers
 
 
 log = logging.getLogger()
@@ -214,7 +214,7 @@ def getDataFromDynamo(event):
     print("Item Count: {}".format(iotStaging['Count']))
 
     return iotStaging
-
+'''
 def validate_packet(packet):
     def verify(packet, required_keys, keys_dict):
         for key in packet.keys():
@@ -235,7 +235,7 @@ def validate_packet(packet):
 
         log.info("required validation: {}".format(required_validation))
 
-        type_check = (lambda x: True if x in keys_dict.keys()
+        type_check = (lambda json.dumps(x: True if x in keys_dict.keys()
                                         and type(packet[x]) in keys_dict[
                                             x if x in keys_dict.keys() else "default"] else x)
         validation = list(filter(lambda x: x is not True, map(type_check, packet.keys())))
@@ -253,6 +253,7 @@ def validate_packet(packet):
     keys_dict = { "startDate": [int], "endDate": [int],
             "IotId": [str, unicode],  "default": []}
 
+
     required_validation, validation = verify(packet, required_keys, keys_dict)
 
     if len(required_validation) > 0:
@@ -260,10 +261,10 @@ def validate_packet(packet):
 
     elif len(validation) > 0:
         packet = "The follow keys are not accepted or are of the wrong type: {}".format(validation)
-
+        
 
     return packet
-
+'''
 
 
 
@@ -273,21 +274,31 @@ def validate_packet(packet):
          object context => Environment data related to the compute layer
   @return void
 '''
+
+@cors_headers
 def main(event, context):
     print("Received Event")
     print("Event {}".format(event))
     try:
 
-        packet = validate_packet(event["queryStringParameters"])
+        #packet = validate_packet(event["queryStringParameters"])
+        try:
+            packet = ast.literal_eval(event["queryStringParameters"])
+        except:
+            packet = event["queryStringParameters"]
+        for key in packet.keys():
+            try:
+                packet[key] = ast.literal_eval(packet[key])
+                log.info("Key: {}   packet[key]: {}".format(key, packet[key]))
+            except Exception as e:
+                log.info("Key: {}   packet[key]: {}   Exception: {}".format(key, packet[key], e))
+                #packet[key] = packet[key]
         log.info("packet: {}".format(packet))
         if type(packet) == str:
             return {
                         "isBase64Encoded": False,
                         "statusCode": 400,
-                        "headers": {
-                              'Access-Control-Allow-Origin': '*',
-                              'Access-Control-Allow-Credentials': True,
-                            },
+                        "headers": { 'Content-Type': 'application/json' },
                         "body": json.dumps({"clientError": packet})
                     }
 
@@ -315,12 +326,9 @@ def main(event, context):
 
 
         response = {
-                   "isBase64Encoded": False,
+
                    "statusCode": 200,
-                   "headers": {
-                              'Access-Control-Allow-Origin': '*',
-                              'Access-Control-Allow-Credentials': True,
-                            },
+                   "headers": { 'Content-Type': 'application/json' },
                    "body": json.dumps(data)
                   }
 
@@ -333,10 +341,7 @@ def main(event, context):
         response = {
                     "isBase64Encoded": False,
                     "statusCode": 500,
-                    headers: {
-                              'Access-Control-Allow-Origin': '*',
-                              'Access-Control-Allow-Credentials': True,
-                            },
+                    "headers": { 'Content-Type': 'application/json' },
                     "body": json.dumps({"serverError": e.message})
                     }
     return response

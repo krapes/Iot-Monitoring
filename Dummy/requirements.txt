@@ -10,8 +10,6 @@ docutils==0.14
 idna==2.8
 jedi==0.13.2
 jmespath==0.9.3
-jupyter-client==5.2.4
-jupyter-core==4.4.0
 kiwisolver==1.0.1
 numpy==1.15.4
 pandas==0.23.4
@@ -34,4 +32,4 @@ tornado==5.1.1
 traitlets==4.3.2
 urllib3==1.24.1
 wcwidth==0.1.7
-
+lambda-decorators
