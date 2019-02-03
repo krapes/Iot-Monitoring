@@ -7,6 +7,11 @@ import decimal
 import logging
 import ast
 import signal
+import time
+from lambda_decorators import cors_headers
+
+resource = "arn:aws:states:us-west-2:410775198449:stateMachine:consumptionSF-test"
+executionArn_base = "arn:aws:states:us-west-2:410775198449:stateMachine:consumptionSF-test:"
 
 def sigalrm_handler(signum, frame):
     # We get signal!
@@ -23,6 +28,16 @@ region = os.environ["region"]
 stage = os.environ["stage"]
 
 sfn = boto3.client('stepfunctions', region_name=region)
+s3_client = boto3.resource('s3')
+
+def load_from_s3(url):
+	url = url.split('/')
+	bucket = url[0]
+	key = '/'.join(url[1:])
+	results = s3_client.Bucket(bucket).Object(key=key).get()['Body'].read().decode('utf-8')
+	results = json.loads(results)
+	return results
+
 
 def start_SF(event, resource):
     log.info("-----Start SF------")
@@ -35,7 +50,7 @@ def start_SF(event, resource):
         input=json.JSONEncoder().encode(event)
     )
 
-    return response['executionArn']
+    return response['executionArn']#.split(":")[-1]
 
 def monitor_SF(executionArn):
 	log.info("-----MONITOR_SF: {} ------".format(executionArn))
@@ -45,18 +60,20 @@ def monitor_SF(executionArn):
 	        executionArn=executionArn
 	    )
 	    return response
-
-    response = describeSNF(executionArn)
-    log.info(response)
-    while response['status'] == 'RUNNING':
-        time.sleep(1)
-        response = describeSNF(executionArn)
-
-    log.info(response)
-    data, name = (False, response['executionArn']) if response["status"] != "SUCCEEDED" else (
-    response['output'], response['name'])
-    data = ast.literal_eval(data)
-return data, name
+	#executionArn = executionArn_base + executionArn
+	print(executionArn)
+	response = describeSNF(executionArn)
+	log.info(response)
+	while response['status'] == 'RUNNING':
+		print(response['status'])
+		time.sleep(1)
+		response = describeSNF(executionArn)
+	print(response['status'])
+	log.info(response)
+	data, name = (False, response['executionArn']) if response["status"] != "SUCCEEDED" else (
+	response['output'], response['name'].split(":")[-1])
+	data = ast.literal_eval(data)
+	return data, name
 
 
 def validate_packet(packet):
@@ -108,80 +125,73 @@ def validate_packet(packet):
 
     return packet
 
+@cors_headers
 def main(event, context):
 	start_time = time.time()
-    print("Received Event")
-    print("Event {}".format(event))
-    try:
+	print("Received Event")
+	print("Event {}".format(event))
+	try:
 
-        packet = validate_packet(event["queryStringParameters"])
-        log.info("packet: {}".format(packet))
-        if type(packet) == str:
-            return {
-                        "isBase64Encoded": False,
-                        "statusCode": 400,
-                        "headers": {
-                              'Access-Control-Allow-Origin': '*',
-                              'Access-Control-Allow-Credentials': True,
-                            },
-                        "body": json.dumps({"clientError": packet})
-                    }
+		packet = validate_packet(event["queryStringParameters"])
+		log.info("packet: {}".format(packet))
+		if type(packet) == str:
+			return {
+					"isBase64Encoded": False,
+					"statusCode": 400,
+					"headers": { 'Content-Type': 'application/json' },
+					"body": json.dumps({"clientError": packet})
+					}
 
-        signal.signal(signal.SIGALRM, sigalrm_handler)
-        time_limit = 29 - (time.time() - start_time)
-        signal.alarm(time_limit)
-        print("Begining Exe with time limit of {}".format(time_limit))
+		signal.signal(signal.SIGALRM, sigalrm_handler)
+		time_limit = int(29 - (time.time() - start_time))
+		signal.alarm(time_limit)
+		print("Begining Exe with time limit of {}".format(time_limit))
+		try:
+			executionArn = (start_SF(packet, resource) if 'executionArn' not in packet.keys()
+			 											else packet['executionArn'])
+			url, name = monitor_SF(executionArn)
 
-        executionArn = (start_SF(packet, resource) if 'executionArn' not in packet.keys()
-        				 else packet['executionArn'])
-        data, name = monitor_SF(executionArn)
-
-        except TimeoutException:
-        	print("TimeoutException Triggered")
-        	data = {'executionArn': executionArn}
-        	response = {
-                   "isBase64Encoded": False,
-                   "statusCode": 200,
-                   "headers": {
-                              'Access-Control-Allow-Origin': '*',
-                              'Access-Control-Allow-Credentials': True,
-                            },
-                   "body": json.dumps(data)
-                  }
-        	print(response)
-        	return response
+			print("Returned Data URL: {}".format(url))
+			data = load_from_s3(url)
 
 
-    	data = {"liters": data['liters'],
-    			"time": data['time'],
-    			"discharge": data['discharge'],
-    			"recharge": data['recharge']
-    			"abnormalcharge": data['abnormalcharge']
-    			}
+		except Exception as e:
+			print(e)
+			print("TimeoutException Triggered")
+			data = {'executionArn': executionArn}
+			response = {
+						"isBase64Encoded": False,
+						"statusCode": 200,
+						"headers": { 'Content-Type': 'application/json' },
+						"body": json.dumps(data)
+						}
+			print(response)
+			return response
+		
+		data = {"liter": data['liter'],
+				"time": data['time'],
+				"discharge": data['discharge'],
+				"recharge": data['recharge'],
+				"abnormalcharge": data['abnormalcharge']
+				}
 
-        response = {
-                   "isBase64Encoded": False,
-                   "statusCode": 200,
-                   "headers": {
-                              'Access-Control-Allow-Origin': '*',
-                              'Access-Control-Allow-Credentials': True,
-                            },
-                   "body": json.dumps(data)
-                  }
+		response = {
+					"isBase64Encoded": False,
+					"statusCode": 200,
+					"headers": { 'Content-Type': 'application/json' },
+					"body": json.dumps(data)
+					}
 
 
 
 
 
-    except Exception as e:
-        print(e)
-        response = {
-                    "isBase64Encoded": False,
-                    "statusCode": 500,
-                    "headers": {
-                              'Access-Control-Allow-Origin': '*',
-                              'Access-Control-Allow-Credentials': True,
-                            },
-                    "body": json.dumps({"serverError": e.message})
-                    }
-    return response
+	except Exception as e:
+	    print(e)
+	    response = {
+	                "isBase64Encoded": False,
+	                "statusCode": 500,
+	                "headers": { 'Content-Type': 'application/json' },
+	                "body": json.dumps({"serverError": e})
+	                }
+	return response

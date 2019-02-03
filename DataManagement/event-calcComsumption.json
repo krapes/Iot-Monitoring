@@ -1,4 +1,11 @@
-{"IotId": "francisco",
- "startDate": "17/12/2018 17:44:29",
- "endDate": "17/12/2018 17:58:31",
- "timestep": 120}
+{
+  "startDate": 20181217000000,
+  "liter": [],
+  "endDate": 20181220000000,
+  "estime": [],
+  "IotId": "francisco",
+  "esliter": [],
+  "time": [],
+  "startDT": 1545167057856,
+  "size": 10000
+}

@@ -3,7 +3,7 @@ os.environ['stage'] = 'test'
 os.environ['region'] = 'us-west-2'
 
 
-import averageConsumptionGET
+import consumptionGET
 import json
 
 class context:
@@ -12,4 +12,4 @@ class context:
        setattr(self, "invoked_function_arn", ":averageConsumptionGET")
 
 
-print(averageConsumptionGET.main(json.loads(open('event-averageConsumptionGET.json').read()), context()))
+print(consumptionGET.main(json.loads(open('event-consumptionGET.json').read()), context()))

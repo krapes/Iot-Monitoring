@@ -11,22 +11,31 @@ import math
 import pandas as pd
 import numpy as np
 
-
+pd.set_option('mode.chained_assignment', None)
 
 log = logging.getLogger()
 log.setLevel(logging.INFO)
 
-import os
-os.environ['stage'] = 'test'
-os.environ['region'] = 'us-west-2'
 
 # constants
 global region, stage
 region = os.environ["region"]
 stage = os.environ["stage"]
 
+s3_client = boto3.client('s3')
+
+
+def put_to_s3(data):
+    bucket = 'datamanagement-test-serverlessdeploymentbucket-xq1wyez5yluz'
+    key = 'serverless/DataManagement/' + stage + '/dataDump/stepFuntiondump.json'
+    response = s3_client.put_object(Body=data,
+                      Bucket=bucket,
+                      Key=key)
+    return bucket, key
+
 
 def identify_outliers(df, numB=100):
+    log.info("------ identify_outliers---------")
 
     df['bin'] = pd.cut(df.time, bins=numB, labels=False)
     bins = df.groupby(['bin'])['slope'].agg(['mean', 'count', 'std', 'sum'])
@@ -78,6 +87,7 @@ def identify_outliers(df, numB=100):
     return df, bins
 
 def label_charges(df, bins, threshold=0.25):
+    log.info("------- label_charges-------")
     labels = list(df.label)
     color = list(df.color)
     for i, row in df.iterrows():
@@ -95,7 +105,7 @@ def label_charges(df, bins, threshold=0.25):
     return df
 
 def model_averageDischarge(df, numB=5000, timestep=3600):
-    
+    log.info("--------- model_averageDischarge-----------")
     
     df['bin'] = pd.cut(df.time, bins=numB, labels=False)
     df = df[df['label'] == 'discharge']
@@ -119,6 +129,7 @@ def model_averageDischarge(df, numB=5000, timestep=3600):
     return pcoeff1[0]*timestep
 
 def create_timeRanges(df, bins, target):
+    log.info("--------- create_timeRanges ---------")
     
     def merge_bins(bins):
         bins.reset_index(drop=True, inplace=True)
@@ -169,6 +180,7 @@ def date_handler(obj):
             raise TypeError
 
 def getDataFromDynamo(event):
+    log.info("------- getDataFromDynamo ---------")
     def tableQuery(LastEvaluatedKey=None):
         if LastEvaluatedKey:
             return table.query(
@@ -216,6 +228,7 @@ def getDataFromDynamo(event):
     return iotStaging
 
 def validate_packet(packet):
+
     def verify(packet, required_keys, keys_dict):
         for key in packet.keys():
             try:
@@ -282,12 +295,8 @@ def main(event, context):
         packet = validate_packet(event)
         log.info("packet: {}".format(packet))
         if type(packet) == str:
-            return {
-                        "isBase64Encoded": False,
-                        "statusCode": 400,
-                        "headers": {},
-                        "body": json.dumps({"clientError": packet})
-                    }
+            raise json.dumps({"clientError": packet})
+                    
 
         records = getDataFromDynamo(packet)
         log.info("records from dynamo: {}".format(records))
@@ -309,7 +318,7 @@ def main(event, context):
 
             df, bins = identify_outliers(df)
             df = df[df['label'] != 'outlier']
-            df.reset_index()
+            df = df.reset_index()
             
             df = label_charges(df, bins)
 
@@ -323,12 +332,11 @@ def main(event, context):
 
 
 
-        response = {
-                   "isBase64Encoded": False,
-                   "statusCode": 200,
-                   "headers": {},
-                   "body": json.dumps(data)
-                  }
+        response = json.dumps(data)
+
+        bucket, key = put_to_s3(response)
+        print(bucket, key)
+                  
 
 
 
@@ -336,12 +344,8 @@ def main(event, context):
 
     except Exception as e:
         print(e)
-        response = {
-                    "isBase64Encoded": False,
-                    "statusCode": 500,
-                    "headers": {},
-                    "body": json.dumps({"serverError": e.message})
-                    }
-    return response
+        raise(e)
+
+    return bucket + '/' + key
 
 

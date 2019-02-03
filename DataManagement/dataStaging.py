@@ -200,9 +200,9 @@ def main(event, context):
         raise Exception(e)
 
     response = event
-    response['time'] = time
-    response['liter'] = liters
-    response['estime'] = estime
-    response['esliter'] = esliters
+    #response['time'] = time
+    #response['liter'] = liters
+    #response['estime'] = estime
+    #response['esliter'] = esliters
     return response
 

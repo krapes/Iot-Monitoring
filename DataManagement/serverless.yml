@@ -20,7 +20,7 @@ service: DataManagement # NOTE: update this with your service name
 provider:
   name: aws
   runtime: python2.7
-  timeout: 150
+  timeout: 600
   stage: ${opt:stage, 'test'}
   region: ${opt:region, 'us-west-2'}
   profile: ${opt:profile, 'lythium'}
@@ -55,6 +55,11 @@ provider:
          - "dynamodb:Scan"
        Resource:
          - "arn:aws:dynamodb:us-west-2:410775198449:table/*"
+    -  Effect: "Allow"
+       Action:
+         - "s3:*"
+       Resource:
+         - "*"
 
 
 # you can overwrite defaults here

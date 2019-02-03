@@ -1,5 +1,5 @@
 import boto3
-
+import dataStaging
 
 # Get the service resource.
 session = boto3.session.Session()
@@ -133,14 +133,20 @@ def create_IotStagingProgress():
     # Print out some data about the table.
     print(table.item_count)
 
+
+def fill_IotStaging2(event):
+    response = dataStaging.main(event, "local")
+    print("IotStaging2 filled with {} data points".format(len(response['liter'])))
+
 print(client.list_tables()['TableNames'])
 
 
-createStepFunction()
-#delete_table("IotStaging2")
-#create_IotStaging2()
-#delete_table("IotStagingProgress")
-#create_IotStagingProgress()
+#createStepFunction()
+delete_table("IotStaging2")
+create_IotStaging2()
+delete_table("IotStagingProgress")
+create_IotStagingProgress()
+fill_IotStaging2({"IotId": "francisco"})
 #delete_table("IotStagging")
 
 print(client.list_tables()['TableNames'])
