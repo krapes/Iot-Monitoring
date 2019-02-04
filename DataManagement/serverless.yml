@@ -45,21 +45,27 @@ provider:
        Action:
          - "es:DescribeElasticsearchDomain"
        Resource:
-         - "arn:aws:es:us-west-2:410775198449:domain/*"
+         - "arn:aws:es:${self:provider.region}:410775198449:domain/*"
     -  Effect: "Allow"
        Action:
          - "dynamodb:PutItem"
          - "dynamodb:GetItem"
          - "dynamodb:ListTables"
          - "dynamodb:Query"
-         - "dynamodb:Scan"
        Resource:
-         - "arn:aws:dynamodb:us-west-2:410775198449:table/*"
+         - "arn:aws:dynamodb:${self:provider.region}:410775198449:table/*"
     -  Effect: "Allow"
        Action:
          - "s3:*"
        Resource:
          - "*"
+    -  Effect: "Allow"
+       Action:
+         - "states:StartExecution"
+         - "states:DescribeExecution"
+       Resource:
+         - "arn:aws:states:${self:provider.region}:410775198449:stateMachine:consumptionSF-*"
+         - "arn:aws:states:${self:provider.region}:410775198449:execution:consumptionSF-*:*"
 
 
 # you can overwrite defaults here
@@ -97,7 +103,7 @@ provider:
 plugins:
   - serverless-python-requirements
 package:
-  excludeDevDependencies: false
+  excludeDevDependencies: true
 
 custom:
   pythonRequirements:

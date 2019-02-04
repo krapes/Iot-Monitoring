@@ -12,4 +12,10 @@ class context:
        setattr(self, "invoked_function_arn", ":averageConsumptionGET")
 
 
-print(consumptionGET.main(json.loads(open('event-consumptionGET.json').read()), context()))
+results = consumptionGET.main(json.loads(open('event-consumptionGET.json').read()), context())
+
+print("Status code: {}".format(results['statusCode']))
+for key in results.keys():
+	print(key, type(results[key]))
+	print(results[key])
+print("Process ended with exit code 0")
