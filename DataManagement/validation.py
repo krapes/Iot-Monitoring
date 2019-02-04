@@ -6,6 +6,7 @@ log.setLevel(logging.INFO)
 
 def validate_packet(packet, required_keys, keys_dict):
     def verify(packet, required_keys, keys_dict):
+
         for key in packet.keys():
             try:
                 packet[key] = ast.literal_eval(packet[key])
@@ -22,12 +23,16 @@ def validate_packet(packet, required_keys, keys_dict):
             required_validation = []
 
 
+
         log.info("required validation: {}".format(required_validation))
 
-        type_check = (lambda x: True if x in keys_dict.keys()
-                                        and type(packet[x]) in keys_dict[
-                                            x if x in keys_dict.keys() else "default"] else x)
-        validation = list(filter(lambda x: x is not True, map(type_check, packet.keys())))
+        if len(keys_dict) > 0:
+            type_check = (lambda x: True if x in keys_dict.keys()
+                                            and type(packet[x]) in keys_dict[
+                                                x if x in keys_dict.keys() else "default"] else x)
+            validation = list(filter(lambda x: x is not True, map(type_check, packet.keys())))
+        else:
+            validation = []
 
         log.info("validation: {}".format(validation))
 
@@ -39,13 +44,15 @@ def validate_packet(packet, required_keys, keys_dict):
 
     keys_dict["default"] = []
 
-    required_validation, validation = verify(packet, required_keys, keys_dict)
+    if type(packet) == dict and len(packet.keys()) > 0:
+        required_validation, validation = verify(packet, required_keys, keys_dict)
 
-    if len(required_validation) > 0:
-        packet = "The follow required elements are not present: {}".format(required_validation)
+        if len(required_validation) > 0:
+            packet = "The follow required elements are not present: {}".format(required_validation)
 
-    elif len(validation) > 0:
-        packet = "The follow keys are not accepted or are of the wrong type: {}".format(validation)
-
+        elif len(validation) > 0:
+            packet = "The follow keys are not accepted or are of the wrong type: {}".format(validation)
+    else:
+        packet = {}
 
     return packet

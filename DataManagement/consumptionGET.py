@@ -11,8 +11,7 @@ import time
 from lambda_decorators import  LambdaDecorator, cors_headers
 from validation import validate_packet
 
-resource = "arn:aws:states:us-west-2:410775198449:stateMachine:consumptionSF-test"
-executionArn_base = "arn:aws:states:us-west-2:410775198449:execution:consumptionSF-test:"
+
 
 log = logging.getLogger()
 log.setLevel(logging.INFO)
@@ -25,6 +24,10 @@ stage = os.environ["stage"]
 
 sfn = boto3.client('stepfunctions', region_name=region)
 s3_client = boto3.resource('s3')
+
+resource = "arn:aws:states:"+ region +":410775198449:stateMachine:consumptionSF-"+ stage
+executionArn_base = "arn:aws:states:"+ region +":410775198449:execution:consumptionSF-" \
+						+ stage +":"
 
 
 class validate_and_return(LambdaDecorator):

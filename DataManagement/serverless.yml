@@ -122,6 +122,14 @@ functions:
           cors: true 
   calcConsumption:
     handler: calcConsumption.main
+  IotNamesGET:
+    handler: IotNamesGET.main
+    events:
+      - http:
+          method: GET
+          path: /names
+          resp: json
+          cors: true 
 
 
 #    The following are a few example events you can configure
