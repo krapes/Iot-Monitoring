@@ -11,7 +11,7 @@ idna==2.8
 jedi==0.13.2
 jmespath==0.9.3
 kiwisolver==1.0.1
-numpy==1.15.4
+numpy==1.22.0
 pandas==0.23.4
 parso==0.3.1
 pexpect==4.6.0
